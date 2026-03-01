@@ -39,11 +39,11 @@ python main.py
 - Restart after win/lose: `R`
 - Quit: `Esc`
 
-## Included MVP+
+## Included gameplay
 
-- Player movement and cooldown-based shooting
-- Alien formation movement, edge bounce, and downward drop
-- Alien speed scaling as enemies are defeated
-- Random alien return fire
-- Bullet collision handling (player bullets and alien bullets)
-- Score, lives, start/win/lose states
+- Smoothed player acceleration/deceleration for tighter movement feel
+- Alien formation movement, edge bounce, downward drop, and per-wave speed scaling
+- Alien fire from bottom-most survivors in each column (classic-ish behavior)
+- Destructible bunkers that absorb and degrade from bullet hits
+- Wave progression (`3` waves to win), plus score/lives HUD
+- Start / win / lose states and restart flow
