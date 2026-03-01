@@ -153,7 +153,7 @@ class SpaceInvaders:
         surface = pygame.Surface((cols * cell_w, rows * cell_h), pygame.SRCALPHA)
         for y, row in enumerate(pattern):
             for x, ch in enumerate(row):
-                if ch == "X":
+                if ch not in {"0", " "}:
                     pygame.draw.rect(surface, color, (x * cell_w, y * cell_h, cell_w, cell_h))
         return pygame.transform.scale(surface, size)
 
@@ -167,7 +167,7 @@ class SpaceInvaders:
             "XXXX000XXXX",
             "XXX00000XXX",
         ]
-        return self._sprite_from_pattern([r.replace("0", " ") for r in pattern], INVADER_GREEN, PLAYER_SIZE)
+        return self._sprite_from_pattern(pattern, INVADER_GREEN, PLAYER_SIZE)
 
     def _make_alien_sprites(self) -> list[list[pygame.Surface]]:
         squid_a = [
@@ -232,7 +232,7 @@ class SpaceInvaders:
         ]
 
         def s(p: list[str]) -> pygame.Surface:
-            return self._sprite_from_pattern([r.replace("0", " ") for r in p], INVADER_GREEN, ALIEN_SIZE)
+            return self._sprite_from_pattern(p, INVADER_GREEN, ALIEN_SIZE)
 
         return [[s(squid_a), s(squid_b)], [s(crab_a), s(crab_b)], [s(octo_a), s(octo_b)]]
 
@@ -254,7 +254,7 @@ class SpaceInvaders:
             "00111000000011100",
             "00000110011000000",
         ]
-        return self._sprite_from_pattern([r.replace("0", " ") for r in pattern], UFO_COLOR, UFO_SIZE)
+        return self._sprite_from_pattern(pattern, UFO_COLOR, UFO_SIZE)
 
     def _build_aliens(self) -> list[Alien]:
         aliens: list[Alien] = []
