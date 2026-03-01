@@ -47,6 +47,7 @@ python main.py
 - Invader firing from bottom-most survivors in each column (classic behavior)
 - Destructible bunkers and pixel-style sprites inspired by original Space Invaders silhouettes
 - Animated invader sprite frames + bonus UFO target worth extra points
+- Explosion particle effects on alien/UFO/player hits
 - Wave progression (`3` waves to win), plus score/lives/high-score HUD
 - Persistent local high score saved to `high_score.json`
 - Start / pause / win / lose states and restart flow

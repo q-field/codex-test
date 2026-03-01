@@ -51,6 +51,7 @@ UFO_SPAWN_RANGE_MS = (7000, 12000)
 WIN_WAVES = 3
 HUD_TOP_MARGIN = 8
 ANIM_TICK_MS = 400
+PARTICLE_LIFETIME = 0.35
 HIGH_SCORE_FILE = Path("high_score.json")
 
 BG_COLOR = (10, 12, 20)
@@ -105,6 +106,16 @@ class Alien:
     row: int
 
 
+@dataclass
+class Particle:
+    x: float
+    y: float
+    vx: float
+    vy: float
+    life: float
+    color: tuple[int, int, int]
+
+
 class SpaceInvaders:
     def __init__(self) -> None:
         pygame.init()
@@ -147,6 +158,8 @@ class SpaceInvaders:
         self.ufo_velocity_x = UFO_SPEED
         self.next_ufo_spawn_at = 0
 
+        self.particles: list[Particle] = []
+
         self._start_wave(reset_score=False)
 
 
@@ -168,6 +181,34 @@ class SpaceInvaders:
         if self.score > self.high_score:
             self.high_score = self.score
             self._save_high_score()
+
+    def _spawn_explosion(self, center: tuple[int, int], color: tuple[int, int, int], count: int = 10) -> None:
+        cx, cy = center
+        for _ in range(count):
+            angle = random.uniform(0, 6.28318)
+            speed = random.uniform(40, 170)
+            self.particles.append(
+                Particle(
+                    x=float(cx),
+                    y=float(cy),
+                    vx=speed * pygame.math.Vector2(1, 0).rotate_rad(angle).x,
+                    vy=speed * pygame.math.Vector2(1, 0).rotate_rad(angle).y,
+                    life=PARTICLE_LIFETIME,
+                    color=color,
+                )
+            )
+
+    def _update_particles(self, dt: float) -> None:
+        updated: list[Particle] = []
+        for particle in self.particles:
+            particle.x += particle.vx * dt
+            particle.y += particle.vy * dt
+            particle.vx *= 0.95
+            particle.vy *= 0.95
+            particle.life -= dt
+            if particle.life > 0:
+                updated.append(particle)
+        self.particles = updated
 
     def _sprite_from_pattern(self, pattern: list[str], color: tuple[int, int, int], size: tuple[int, int]) -> pygame.Surface:
         rows = len(pattern)
@@ -315,6 +356,7 @@ class SpaceInvaders:
         self.alien_bullets.clear()
         self.bunkers = self._build_bunkers()
         self.ufo = None
+        self.particles.clear()
         self._schedule_next_ufo_spawn()
         self._schedule_next_alien_shot()
 
@@ -360,6 +402,7 @@ class SpaceInvaders:
         self._update_ufo(dt)
         self._maybe_fire_alien_bullet()
         self._update_alien_bullets(dt)
+        self._update_particles(dt)
         self._handle_collisions()
         self._check_end_conditions()
 
@@ -500,6 +543,7 @@ class SpaceInvaders:
             if self.ufo and bullet_rect.colliderect(self.ufo):
                 self.score += 100
                 self._update_high_score()
+                self._spawn_explosion(self.ufo.center, UFO_COLOR, count=18)
                 self.ufo = None
                 self.player_bullet = None
                 self._schedule_next_ufo_spawn()
@@ -509,7 +553,9 @@ class SpaceInvaders:
                 hit_index = next((i for i, alien in enumerate(self.aliens) if alien.rect.colliderect(bullet_rect)), None)
                 if hit_index is not None:
                     row = self.aliens[hit_index].row
+                    hit_alien = self.aliens[hit_index]
                     del self.aliens[hit_index]
+                    self._spawn_explosion(hit_alien.rect.center, INVADER_GREEN, count=10)
                     self.player_bullet = None
                     self.score += ROW_SCORES[row] + (self.wave - 1) * 2
                     self._update_high_score()
@@ -523,6 +569,7 @@ class SpaceInvaders:
             if bullet_rect.colliderect(player_rect):
                 self.player_lives -= 1
                 self.player_hit_flash_until = pygame.time.get_ticks() + 120
+                self._spawn_explosion(player_rect.center, PLAYER_HIT_FLASH, count=16)
             else:
                 surviving_bullets.append(bullet)
         self.alien_bullets = surviving_bullets
@@ -574,6 +621,12 @@ class SpaceInvaders:
 
         for bullet in self.alien_bullets:
             self.screen.blit(self.alien_bullet_sprite, bullet.rect.topleft)
+
+        for particle in self.particles:
+            alpha = max(30, min(255, int((particle.life / PARTICLE_LIFETIME) * 255)))
+            p_surf = pygame.Surface((4, 4), pygame.SRCALPHA)
+            p_surf.fill((*particle.color, alpha))
+            self.screen.blit(p_surf, (int(particle.x), int(particle.y)))
 
         self._draw_hud()
 
