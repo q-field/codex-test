@@ -36,6 +36,7 @@ python main.py
 - Move: `A/D` or `Left/Right`
 - Shoot: `Space`
 - Start game: `Enter` (or `Space` on start screen)
+- Pause/resume: `P`
 - Restart after win/lose: `R`
 - Quit: `Esc`
 
@@ -46,5 +47,6 @@ python main.py
 - Invader firing from bottom-most survivors in each column (classic behavior)
 - Destructible bunkers and pixel-style sprites inspired by original Space Invaders silhouettes
 - Animated invader sprite frames + bonus UFO target worth extra points
-- Wave progression (`3` waves to win), plus score/lives HUD
-- Start / win / lose states and restart flow
+- Wave progression (`3` waves to win), plus score/lives/high-score HUD
+- Persistent local high score saved to `high_score.json`
+- Start / pause / win / lose states and restart flow

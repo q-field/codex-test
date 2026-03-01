@@ -1,6 +1,8 @@
+import json
 import random
 import sys
 from dataclasses import dataclass
+from pathlib import Path
 
 import pygame
 
@@ -49,6 +51,7 @@ UFO_SPAWN_RANGE_MS = (7000, 12000)
 WIN_WAVES = 3
 HUD_TOP_MARGIN = 8
 ANIM_TICK_MS = 400
+HIGH_SCORE_FILE = Path("high_score.json")
 
 BG_COLOR = (10, 12, 20)
 INVADER_GREEN = (110, 255, 120)
@@ -116,7 +119,7 @@ class SpaceInvaders:
         self.ufo_sprite = self._make_ufo_sprite()
 
         self.running = True
-        self.state = "start"  # start | playing | win | lose
+        self.state = "start"  # start | playing | paused | win | lose
 
         self.player = Ship(
             x=WIDTH // 2 - PLAYER_SIZE[0] // 2,
@@ -135,6 +138,7 @@ class SpaceInvaders:
 
         self.wave = 1
         self.score = 0
+        self.high_score = self._load_high_score()
         self.aliens: list[Alien] = []
         self.alien_dir = 1
         self.bunkers: list[BunkerCell] = []
@@ -144,6 +148,26 @@ class SpaceInvaders:
         self.next_ufo_spawn_at = 0
 
         self._start_wave(reset_score=False)
+
+
+    def _load_high_score(self) -> int:
+        try:
+            data = json.loads(HIGH_SCORE_FILE.read_text())
+        except (FileNotFoundError, json.JSONDecodeError, OSError):
+            return 0
+        value = data.get("high_score", 0)
+        return int(value) if isinstance(value, int) and value >= 0 else 0
+
+    def _save_high_score(self) -> None:
+        try:
+            HIGH_SCORE_FILE.write_text(json.dumps({"high_score": self.high_score}, indent=2))
+        except OSError:
+            pass
+
+    def _update_high_score(self) -> None:
+        if self.score > self.high_score:
+            self.high_score = self.score
+            self._save_high_score()
 
     def _sprite_from_pattern(self, pattern: list[str], color: tuple[int, int, int], size: tuple[int, int]) -> pygame.Surface:
         rows = len(pattern)
@@ -323,6 +347,8 @@ class SpaceInvaders:
                     self.running = False
                 elif event.key in {pygame.K_RETURN, pygame.K_SPACE} and self.state == "start":
                     self.state = "playing"
+                elif event.key == pygame.K_p and self.state in {"playing", "paused"}:
+                    self.state = "paused" if self.state == "playing" else "playing"
                 elif event.key == pygame.K_r and self.state in {"win", "lose"}:
                     self._restart()
 
@@ -473,6 +499,7 @@ class SpaceInvaders:
             bullet_rect = self.player_bullet.rect
             if self.ufo and bullet_rect.colliderect(self.ufo):
                 self.score += 100
+                self._update_high_score()
                 self.ufo = None
                 self.player_bullet = None
                 self._schedule_next_ufo_spawn()
@@ -485,6 +512,7 @@ class SpaceInvaders:
                     del self.aliens[hit_index]
                     self.player_bullet = None
                     self.score += ROW_SCORES[row] + (self.wave - 1) * 2
+                    self._update_high_score()
 
         player_rect = self.player.rect
         surviving_bullets: list[Bullet] = []
@@ -553,6 +581,8 @@ class SpaceInvaders:
             self._draw_center_text("PRESS ENTER TO START")
         elif self.state == "win":
             self._draw_center_text("YOU WIN! Press R to play again")
+        elif self.state == "paused":
+            self._draw_center_text("PAUSED - Press P to resume")
         elif self.state == "lose":
             self._draw_center_text("GAME OVER! Press R to retry")
 
@@ -562,7 +592,9 @@ class SpaceInvaders:
         score_surface = self.font.render(f"Score: {self.score}", True, TEXT_COLOR)
         lives_surface = self.font.render(f"Lives: {self.player_lives}", True, TEXT_COLOR)
         wave_surface = self.font.render(f"Wave: {self.wave}/{WIN_WAVES}", True, TEXT_COLOR)
+        high_surface = self.font.render(f"High: {self.high_score}", True, TEXT_COLOR)
         self.screen.blit(score_surface, (16, HUD_TOP_MARGIN))
+        self.screen.blit(high_surface, (16, HUD_TOP_MARGIN + 26))
         self.screen.blit(lives_surface, (WIDTH - lives_surface.get_width() - 16, HUD_TOP_MARGIN))
         self.screen.blit(wave_surface, (WIDTH // 2 - wave_surface.get_width() // 2, HUD_TOP_MARGIN))
 
@@ -581,6 +613,7 @@ class SpaceInvaders:
         self.player_bullet = None
         self.alien_bullets.clear()
         self.ufo = None
+        self._update_high_score()
         self.state = "playing"
         self._start_wave(reset_score=True)
 
