@@ -42,8 +42,8 @@ python main.py
 ## Included gameplay
 
 - Smoothed player acceleration/deceleration for tighter movement feel
-- Alien formation movement, edge bounce, downward drop, and per-wave speed scaling
+- Alien formation movement with gentler, more beatable per-wave speed scaling
 - Alien fire from bottom-most survivors in each column (classic-ish behavior)
-- Destructible bunkers that absorb and degrade from bullet hits
+- Destructible bunkers and simple sprite-style visuals (player, aliens, bullets)
 - Wave progression (`3` waves to win), plus score/lives HUD
 - Start / win / lose states and restart flow

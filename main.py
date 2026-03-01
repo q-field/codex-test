@@ -25,10 +25,10 @@ ALIEN_GAP = (16, 16)
 ALIEN_START = (70, 80)
 ALIEN_DROP_PX = 20
 ALIEN_BASE_SPEED = 60
-ALIEN_SPEED_PER_KILL = 4
-ALIEN_WAVE_SPEED_BONUS = 14
-ALIEN_SHOT_INTERVAL_BASE = (500, 1200)
-ALIEN_SHOT_INTERVAL_MIN = (160, 360)
+ALIEN_SPEED_PER_KILL = 2
+ALIEN_WAVE_SPEED_BONUS = 6
+ALIEN_SHOT_INTERVAL_BASE = (650, 1400)
+ALIEN_SHOT_INTERVAL_MIN = (360, 700)
 
 BULLET_SIZE = (6, 16)
 PLAYER_BULLET_SPEED = -540
@@ -97,6 +97,10 @@ class SpaceInvaders:
         self.clock = pygame.time.Clock()
         self.font = pygame.font.SysFont("consolas", 24)
 
+        self.player_sprite = self._make_player_sprite()
+        self.alien_sprite = self._make_alien_sprite()
+        self.player_bullet_sprite, self.alien_bullet_sprite = self._make_bullet_sprites()
+
         self.running = True
         self.state = "start"  # start | playing | win | lose
 
@@ -121,6 +125,33 @@ class SpaceInvaders:
         self.alien_dir = 1
         self.bunkers: list[BunkerCell] = []
         self._start_wave(reset_score=False)
+
+    def _make_player_sprite(self) -> pygame.Surface:
+        surface = pygame.Surface(PLAYER_SIZE, pygame.SRCALPHA)
+        w, h = PLAYER_SIZE
+        points = [(w // 2, 0), (w - 4, h - 2), (4, h - 2)]
+        pygame.draw.polygon(surface, PLAYER_COLOR, points)
+        pygame.draw.rect(surface, (40, 90, 55), (w // 2 - 5, h // 2, 10, h // 2 - 2))
+        return surface
+
+    def _make_alien_sprite(self) -> pygame.Surface:
+        surface = pygame.Surface(ALIEN_SIZE, pygame.SRCALPHA)
+        w, h = ALIEN_SIZE
+        pygame.draw.rect(surface, ALIEN_COLOR, (6, 6, w - 12, h - 10), border_radius=4)
+        pygame.draw.circle(surface, (20, 30, 50), (w // 3, h // 2), 3)
+        pygame.draw.circle(surface, (20, 30, 50), (2 * w // 3, h // 2), 3)
+        pygame.draw.rect(surface, (90, 150, 200), (10, h - 6, 6, 4))
+        pygame.draw.rect(surface, (90, 150, 200), (w - 16, h - 6, 6, 4))
+        return surface
+
+    def _make_bullet_sprites(self) -> tuple[pygame.Surface, pygame.Surface]:
+        player = pygame.Surface(BULLET_SIZE, pygame.SRCALPHA)
+        alien = pygame.Surface(BULLET_SIZE, pygame.SRCALPHA)
+        pygame.draw.rect(player, PLAYER_BULLET_COLOR, (0, 0, BULLET_SIZE[0], BULLET_SIZE[1]), border_radius=2)
+        pygame.draw.rect(player, (255, 255, 255), (2, 2, 2, BULLET_SIZE[1] - 4))
+        pygame.draw.rect(alien, ALIEN_BULLET_COLOR, (0, 0, BULLET_SIZE[0], BULLET_SIZE[1]), border_radius=2)
+        pygame.draw.rect(alien, (255, 180, 180), (2, 2, 2, BULLET_SIZE[1] - 4))
+        return player, alien
 
     def _build_aliens(self) -> list[pygame.Rect]:
         aliens: list[pygame.Rect] = []
@@ -166,7 +197,7 @@ class SpaceInvaders:
 
     def _schedule_next_alien_shot(self) -> None:
         min_delay, max_delay = ALIEN_SHOT_INTERVAL_BASE
-        reduction = (self.wave - 1) * 100
+        reduction = (self.wave - 1) * 70
         min_delay = max(ALIEN_SHOT_INTERVAL_MIN[0], min_delay - reduction)
         max_delay = max(ALIEN_SHOT_INTERVAL_MIN[1], max_delay - reduction)
         delay = random.randint(min_delay, max_delay)
@@ -370,17 +401,22 @@ class SpaceInvaders:
             color = (min(255, BUNKER_COLOR[0]), min(255, shade), min(255, BUNKER_COLOR[2]))
             pygame.draw.rect(self.screen, color, cell.rect)
 
-        player_color = PLAYER_HIT_FLASH if pygame.time.get_ticks() < self.player_hit_flash_until else PLAYER_COLOR
-        pygame.draw.rect(self.screen, player_color, self.player.rect)
+        player_color = PLAYER_HIT_FLASH if pygame.time.get_ticks() < self.player_hit_flash_until else None
+        if player_color:
+            flash = self.player_sprite.copy()
+            flash.fill(player_color, special_flags=pygame.BLEND_RGBA_MULT)
+            self.screen.blit(flash, self.player.rect.topleft)
+        else:
+            self.screen.blit(self.player_sprite, self.player.rect.topleft)
 
         for alien in self.aliens:
-            pygame.draw.rect(self.screen, ALIEN_COLOR, alien)
+            self.screen.blit(self.alien_sprite, alien.topleft)
 
         if self.player_bullet:
-            pygame.draw.rect(self.screen, PLAYER_BULLET_COLOR, self.player_bullet.rect)
+            self.screen.blit(self.player_bullet_sprite, self.player_bullet.rect.topleft)
 
         for bullet in self.alien_bullets:
-            pygame.draw.rect(self.screen, ALIEN_BULLET_COLOR, bullet.rect)
+            self.screen.blit(self.alien_bullet_sprite, bullet.rect.topleft)
 
         self._draw_hud()
 
