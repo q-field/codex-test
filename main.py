@@ -41,17 +41,24 @@ BUNKER_Y = HEIGHT - 140
 BUNKER_CELL = 8
 BUNKER_HP = 3
 
+UFO_SIZE = (58, 24)
+UFO_Y = 44
+UFO_SPEED = 120
+UFO_SPAWN_RANGE_MS = (7000, 12000)
+
 WIN_WAVES = 3
 HUD_TOP_MARGIN = 8
+ANIM_TICK_MS = 400
 
 BG_COLOR = (10, 12, 20)
-PLAYER_COLOR = (120, 255, 150)
+INVADER_GREEN = (110, 255, 120)
 PLAYER_HIT_FLASH = (255, 150, 150)
-ALIEN_COLOR = (120, 200, 255)
 PLAYER_BULLET_COLOR = (255, 255, 120)
 ALIEN_BULLET_COLOR = (255, 120, 120)
-BUNKER_COLOR = (150, 255, 180)
+UFO_COLOR = (255, 80, 120)
 TEXT_COLOR = (245, 245, 245)
+
+ROW_SCORES = [30, 20, 20, 10, 10]
 
 
 @dataclass
@@ -89,6 +96,12 @@ class BunkerCell:
     hp: int = BUNKER_HP
 
 
+@dataclass
+class Alien:
+    rect: pygame.Rect
+    row: int
+
+
 class SpaceInvaders:
     def __init__(self) -> None:
         pygame.init()
@@ -98,8 +111,9 @@ class SpaceInvaders:
         self.font = pygame.font.SysFont("consolas", 24)
 
         self.player_sprite = self._make_player_sprite()
-        self.alien_sprite = self._make_alien_sprite()
+        self.alien_sprites = self._make_alien_sprites()
         self.player_bullet_sprite, self.alien_bullet_sprite = self._make_bullet_sprites()
+        self.ufo_sprite = self._make_ufo_sprite()
 
         self.running = True
         self.state = "start"  # start | playing | win | lose
@@ -121,28 +135,106 @@ class SpaceInvaders:
 
         self.wave = 1
         self.score = 0
-        self.aliens: list[pygame.Rect] = []
+        self.aliens: list[Alien] = []
         self.alien_dir = 1
         self.bunkers: list[BunkerCell] = []
+
+        self.ufo: pygame.Rect | None = None
+        self.ufo_velocity_x = UFO_SPEED
+        self.next_ufo_spawn_at = 0
+
         self._start_wave(reset_score=False)
 
-    def _make_player_sprite(self) -> pygame.Surface:
-        surface = pygame.Surface(PLAYER_SIZE, pygame.SRCALPHA)
-        w, h = PLAYER_SIZE
-        points = [(w // 2, 0), (w - 4, h - 2), (4, h - 2)]
-        pygame.draw.polygon(surface, PLAYER_COLOR, points)
-        pygame.draw.rect(surface, (40, 90, 55), (w // 2 - 5, h // 2, 10, h // 2 - 2))
-        return surface
+    def _sprite_from_pattern(self, pattern: list[str], color: tuple[int, int, int], size: tuple[int, int]) -> pygame.Surface:
+        rows = len(pattern)
+        cols = len(pattern[0]) if rows else 1
+        cell_w = max(1, size[0] // cols)
+        cell_h = max(1, size[1] // rows)
+        surface = pygame.Surface((cols * cell_w, rows * cell_h), pygame.SRCALPHA)
+        for y, row in enumerate(pattern):
+            for x, ch in enumerate(row):
+                if ch == "X":
+                    pygame.draw.rect(surface, color, (x * cell_w, y * cell_h, cell_w, cell_h))
+        return pygame.transform.scale(surface, size)
 
-    def _make_alien_sprite(self) -> pygame.Surface:
-        surface = pygame.Surface(ALIEN_SIZE, pygame.SRCALPHA)
-        w, h = ALIEN_SIZE
-        pygame.draw.rect(surface, ALIEN_COLOR, (6, 6, w - 12, h - 10), border_radius=4)
-        pygame.draw.circle(surface, (20, 30, 50), (w // 3, h // 2), 3)
-        pygame.draw.circle(surface, (20, 30, 50), (2 * w // 3, h // 2), 3)
-        pygame.draw.rect(surface, (90, 150, 200), (10, h - 6, 6, 4))
-        pygame.draw.rect(surface, (90, 150, 200), (w - 16, h - 6, 6, 4))
-        return surface
+    def _make_player_sprite(self) -> pygame.Surface:
+        pattern = [
+            "00000X00000",
+            "0000XXX0000",
+            "000XXXXX000",
+            "00XXXXXXX00",
+            "XXXXXXXXXXX",
+            "XXXX000XXXX",
+            "XXX00000XXX",
+        ]
+        return self._sprite_from_pattern([r.replace("0", " ") for r in pattern], INVADER_GREEN, PLAYER_SIZE)
+
+    def _make_alien_sprites(self) -> list[list[pygame.Surface]]:
+        squid_a = [
+            "0011001100",
+            "0001111000",
+            "0011111100",
+            "0110110110",
+            "1111111111",
+            "1011111101",
+            "0011001100",
+            "0100000010",
+        ]
+        squid_b = [
+            "0011001100",
+            "0001111000",
+            "0011111100",
+            "0110110110",
+            "1111111111",
+            "0011111100",
+            "0101001010",
+            "1000000001",
+        ]
+        crab_a = [
+            "0010000100",
+            "0001001000",
+            "0011111100",
+            "0110110110",
+            "1111111111",
+            "1011111101",
+            "1010000101",
+            "0101001010",
+        ]
+        crab_b = [
+            "0010000100",
+            "1001001001",
+            "1011111101",
+            "1110110111",
+            "1111111111",
+            "0011111100",
+            "0101001010",
+            "1010000101",
+        ]
+        octo_a = [
+            "0001111000",
+            "0011111100",
+            "0110110110",
+            "1111111111",
+            "1101111011",
+            "1100000011",
+            "0011001100",
+            "0110011001",
+        ]
+        octo_b = [
+            "0001111000",
+            "0011111100",
+            "0110110110",
+            "1111111111",
+            "1101111011",
+            "0010000100",
+            "0101001010",
+            "1000000001",
+        ]
+
+        def s(p: list[str]) -> pygame.Surface:
+            return self._sprite_from_pattern([r.replace("0", " ") for r in p], INVADER_GREEN, ALIEN_SIZE)
+
+        return [[s(squid_a), s(squid_b)], [s(crab_a), s(crab_b)], [s(octo_a), s(octo_b)]]
 
     def _make_bullet_sprites(self) -> tuple[pygame.Surface, pygame.Surface]:
         player = pygame.Surface(BULLET_SIZE, pygame.SRCALPHA)
@@ -153,13 +245,24 @@ class SpaceInvaders:
         pygame.draw.rect(alien, (255, 180, 180), (2, 2, 2, BULLET_SIZE[1] - 4))
         return player, alien
 
-    def _build_aliens(self) -> list[pygame.Rect]:
-        aliens: list[pygame.Rect] = []
+    def _make_ufo_sprite(self) -> pygame.Surface:
+        pattern = [
+            "00011111111111000",
+            "00111111111111100",
+            "01101101101101110",
+            "11111111111111111",
+            "00111000000011100",
+            "00000110011000000",
+        ]
+        return self._sprite_from_pattern([r.replace("0", " ") for r in pattern], UFO_COLOR, UFO_SIZE)
+
+    def _build_aliens(self) -> list[Alien]:
+        aliens: list[Alien] = []
         for row in range(ALIEN_ROWS):
             for col in range(ALIEN_COLS):
                 x = ALIEN_START[0] + col * (ALIEN_SIZE[0] + ALIEN_GAP[0])
                 y = ALIEN_START[1] + row * (ALIEN_SIZE[1] + ALIEN_GAP[1])
-                aliens.append(pygame.Rect(x, y, ALIEN_SIZE[0], ALIEN_SIZE[1]))
+                aliens.append(Alien(pygame.Rect(x, y, ALIEN_SIZE[0], ALIEN_SIZE[1]), row))
         return aliens
 
     def _build_bunkers(self) -> list[BunkerCell]:
@@ -172,15 +275,9 @@ class SpaceInvaders:
             left = spacing * (idx + 1) - BUNKER_WIDTH // 2
             for row in range(rows):
                 for col in range(cols):
-                    # carve a tiny arch in lower middle
                     if row >= rows - 2 and cols // 3 <= col <= cols - cols // 3:
                         continue
-                    rect = pygame.Rect(
-                        left + col * BUNKER_CELL,
-                        BUNKER_Y + row * BUNKER_CELL,
-                        BUNKER_CELL,
-                        BUNKER_CELL,
-                    )
+                    rect = pygame.Rect(left + col * BUNKER_CELL, BUNKER_Y + row * BUNKER_CELL, BUNKER_CELL, BUNKER_CELL)
                     cells.append(BunkerCell(rect))
         return cells
 
@@ -193,6 +290,8 @@ class SpaceInvaders:
         self.player_bullet = None
         self.alien_bullets.clear()
         self.bunkers = self._build_bunkers()
+        self.ufo = None
+        self._schedule_next_ufo_spawn()
         self._schedule_next_alien_shot()
 
     def _schedule_next_alien_shot(self) -> None:
@@ -200,8 +299,10 @@ class SpaceInvaders:
         reduction = (self.wave - 1) * 70
         min_delay = max(ALIEN_SHOT_INTERVAL_MIN[0], min_delay - reduction)
         max_delay = max(ALIEN_SHOT_INTERVAL_MIN[1], max_delay - reduction)
-        delay = random.randint(min_delay, max_delay)
-        self.next_alien_shot_at = pygame.time.get_ticks() + delay
+        self.next_alien_shot_at = pygame.time.get_ticks() + random.randint(min_delay, max_delay)
+
+    def _schedule_next_ufo_spawn(self) -> None:
+        self.next_ufo_spawn_at = pygame.time.get_ticks() + random.randint(*UFO_SPAWN_RANGE_MS)
 
     def run(self) -> None:
         while self.running:
@@ -229,6 +330,8 @@ class SpaceInvaders:
         self._update_player(dt)
         self._update_player_bullet(dt)
         self._update_alien_formation(dt)
+        self._maybe_spawn_ufo()
+        self._update_ufo(dt)
         self._maybe_fire_alien_bullet()
         self._update_alien_bullets(dt)
         self._handle_collisions()
@@ -298,22 +401,39 @@ class SpaceInvaders:
             dx = self.alien_dir
 
         for alien in self.aliens:
-            alien.x += dx
+            alien.rect.x += dx
 
-        if any(alien.right >= WIDTH - 12 or alien.left <= 12 for alien in self.aliens):
+        if any(a.rect.right >= WIDTH - 12 or a.rect.left <= 12 for a in self.aliens):
             self.alien_dir *= -1
             for alien in self.aliens:
-                alien.y += ALIEN_DROP_PX
+                alien.rect.y += ALIEN_DROP_PX
 
-    def _select_alien_shooter(self) -> pygame.Rect | None:
+    def _select_alien_shooter(self) -> Alien | None:
         if not self.aliens:
             return None
-        by_col: dict[int, pygame.Rect] = {}
+        by_col: dict[int, Alien] = {}
         for alien in self.aliens:
-            col = round((alien.x - ALIEN_START[0]) / (ALIEN_SIZE[0] + ALIEN_GAP[0]))
-            if col not in by_col or alien.y > by_col[col].y:
+            col = round((alien.rect.x - ALIEN_START[0]) / (ALIEN_SIZE[0] + ALIEN_GAP[0]))
+            if col not in by_col or alien.rect.y > by_col[col].rect.y:
                 by_col[col] = alien
         return random.choice(list(by_col.values())) if by_col else None
+
+    def _maybe_spawn_ufo(self) -> None:
+        now = pygame.time.get_ticks()
+        if self.ufo is not None or now < self.next_ufo_spawn_at:
+            return
+        from_left = random.choice([True, False])
+        x = -UFO_SIZE[0] if from_left else WIDTH
+        self.ufo_velocity_x = UFO_SPEED if from_left else -UFO_SPEED
+        self.ufo = pygame.Rect(x, UFO_Y, UFO_SIZE[0], UFO_SIZE[1])
+
+    def _update_ufo(self, dt: float) -> None:
+        if self.ufo is None:
+            return
+        self.ufo.x += int(self.ufo_velocity_x * dt)
+        if self.ufo.right < 0 or self.ufo.left > WIDTH:
+            self.ufo = None
+            self._schedule_next_ufo_spawn()
 
     def _maybe_fire_alien_bullet(self) -> None:
         now = pygame.time.get_ticks()
@@ -326,8 +446,8 @@ class SpaceInvaders:
 
         self.alien_bullets.append(
             Bullet(
-                x=shooter.centerx - BULLET_SIZE[0] / 2,
-                y=shooter.bottom,
+                x=shooter.rect.centerx - BULLET_SIZE[0] / 2,
+                y=shooter.rect.bottom,
                 w=BULLET_SIZE[0],
                 h=BULLET_SIZE[1],
                 vy=ALIEN_BULLET_SPEED,
@@ -351,14 +471,20 @@ class SpaceInvaders:
     def _handle_collisions(self) -> None:
         if self.player_bullet:
             bullet_rect = self.player_bullet.rect
-            if self._damage_bunker(bullet_rect):
+            if self.ufo and bullet_rect.colliderect(self.ufo):
+                self.score += 100
+                self.ufo = None
+                self.player_bullet = None
+                self._schedule_next_ufo_spawn()
+            elif self._damage_bunker(bullet_rect):
                 self.player_bullet = None
             else:
-                hit_index = next((i for i, alien in enumerate(self.aliens) if alien.colliderect(bullet_rect)), None)
+                hit_index = next((i for i, alien in enumerate(self.aliens) if alien.rect.colliderect(bullet_rect)), None)
                 if hit_index is not None:
+                    row = self.aliens[hit_index].row
                     del self.aliens[hit_index]
                     self.player_bullet = None
-                    self.score += 10 + (self.wave - 1) * 2
+                    self.score += ROW_SCORES[row] + (self.wave - 1) * 2
 
         player_rect = self.player.rect
         surviving_bullets: list[Bullet] = []
@@ -381,8 +507,8 @@ class SpaceInvaders:
             return
 
         if self.aliens:
-            lowest_alien = max(self.aliens, key=lambda alien: alien.bottom)
-            if lowest_alien.bottom >= self.player.y:
+            lowest_alien = max(self.aliens, key=lambda alien: alien.rect.bottom)
+            if lowest_alien.rect.bottom >= self.player.y:
                 self.state = "lose"
                 return
 
@@ -398,19 +524,22 @@ class SpaceInvaders:
 
         for cell in self.bunkers:
             shade = 70 + cell.hp * 55
-            color = (min(255, BUNKER_COLOR[0]), min(255, shade), min(255, BUNKER_COLOR[2]))
-            pygame.draw.rect(self.screen, color, cell.rect)
+            pygame.draw.rect(self.screen, (70, min(255, shade), 95), cell.rect)
 
-        player_color = PLAYER_HIT_FLASH if pygame.time.get_ticks() < self.player_hit_flash_until else None
-        if player_color:
+        if pygame.time.get_ticks() < self.player_hit_flash_until:
             flash = self.player_sprite.copy()
-            flash.fill(player_color, special_flags=pygame.BLEND_RGBA_MULT)
+            flash.fill(PLAYER_HIT_FLASH, special_flags=pygame.BLEND_RGBA_MULT)
             self.screen.blit(flash, self.player.rect.topleft)
         else:
             self.screen.blit(self.player_sprite, self.player.rect.topleft)
 
+        frame = (pygame.time.get_ticks() // ANIM_TICK_MS) % 2
         for alien in self.aliens:
-            self.screen.blit(self.alien_sprite, alien.topleft)
+            sprite_group = 0 if alien.row == 0 else (1 if alien.row <= 2 else 2)
+            self.screen.blit(self.alien_sprites[sprite_group][frame], alien.rect.topleft)
+
+        if self.ufo:
+            self.screen.blit(self.ufo_sprite, self.ufo.topleft)
 
         if self.player_bullet:
             self.screen.blit(self.player_bullet_sprite, self.player_bullet.rect.topleft)
@@ -451,6 +580,7 @@ class SpaceInvaders:
         self.last_player_shot_time = 0
         self.player_bullet = None
         self.alien_bullets.clear()
+        self.ufo = None
         self.state = "playing"
         self._start_wave(reset_score=True)
 

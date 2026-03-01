@@ -42,8 +42,9 @@ python main.py
 ## Included gameplay
 
 - Smoothed player acceleration/deceleration for tighter movement feel
-- Alien formation movement with gentler, more beatable per-wave speed scaling
-- Alien fire from bottom-most survivors in each column (classic-ish behavior)
-- Destructible bunkers and simple sprite-style visuals (player, aliens, bullets)
+- Gentler per-wave speed scaling so progression stays beatable
+- Invader firing from bottom-most survivors in each column (classic behavior)
+- Destructible bunkers and pixel-style sprites inspired by original Space Invaders silhouettes
+- Animated invader sprite frames + bonus UFO target worth extra points
 - Wave progression (`3` waves to win), plus score/lives HUD
 - Start / win / lose states and restart flow
